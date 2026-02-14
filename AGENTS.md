@@ -37,7 +37,7 @@ The fetch wrapper is the most reliable interception point. Per-session tracking 
 
 ### Why keep file logging?
 
-The append-only log file serves a different purpose than the tool: real-time debugging in a separate terminal (`tail -F`). Useful for watching subagent activity live. Log path: `~/.local/share/opencode/log/copilot-stats.txt`.
+The append-only log file serves a different purpose than the tool: real-time debugging in a separate terminal (`tail -F`). Useful for watching subagent activity live. The log path follows XDG conventions — `$XDG_DATA_HOME/opencode/log/copilot-stats.txt`, defaulting to `~/.local/share/opencode/log/copilot-stats.txt`.
 
 ### Why `gpt-5-mini` for the command?
 
@@ -45,65 +45,16 @@ The `/copilot-stats` command sets `model: github-copilot/gpt-5-mini` in its fron
 
 ## Multiplier Table
 
-Source: https://docs.github.com/en/copilot/concepts/billing/copilot-requests
+The `multipliers` object in `plugins/copilot-stats.ts` is the single source of truth. Unlisted models default to 1x. Update the object when GitHub changes pricing — see the [billing documentation](https://docs.github.com/en/copilot/concepts/billing/copilot-requests).
 
-Models with non-1x multipliers (all unlisted models default to 1x):
-
-| Model                  | Multiplier |
-|------------------------|------------|
-| gpt-5-mini             | 0          |
-| gpt-4.1                | 0          |
-| gpt-4o                 | 0          |
-| raptor-mini            | 0          |
-| grok-code-fast-1       | 0.25       |
-| gpt-5.1-codex-mini     | 0.33       |
-| claude-haiku-4.5       | 0.33       |
-| gemini-3-flash-preview | 0.33       |
-| claude-opus-4.5        | 3          |
-| claude-opus-4.6        | 3          |
-| claude-opus-41         | 10         |
-
-This table is hardcoded. Update it manually when GitHub changes pricing.
-
-## Deliverables
+## File Layout
 
 Two files, both auto-discovered by OpenCode (no `opencode.json` changes needed):
 
-### `~/.config/opencode/plugins/copilot-stats.ts`
-
-Plugin file. OpenCode auto-discovers `{plugin,plugins}/*.{ts,js}` from `~/.config/opencode/`.
-
-Responsibilities:
-
-- **Fetch interception**: Wrap `globalThis.fetch`. For requests to GitHub endpoints with an `x-initiator` header, extract the model name from the JSON body and the initiator from the header.
-- **In-memory metrics**: Accumulate per model+initiator pair: request count and premium cost (count * multiplier). Data structure keyed by `"${model}|${initiator}"`.
-- **Tool registration**: Register a `copilot_stats` tool via the `tool` hook. The `execute` function reads the in-memory metrics and returns a markdown table sorted by model, then initiator. Example output:
-
-```
-| Model            | Initiator | Count |  Cost  |
-|------------------|-----------|-------|--------|
-| claude-haiku-4.5 | user      |    10 |   3.30 |
-| claude-opus-4.6  | agent     |    50 |   0    |
-| claude-opus-4.6  | user      |    30 |  90    |
-| gpt-5-mini       | agent     |   321 |   0    |
-| gpt-5-mini       | user      |    77 |   0    |
-```
-
-- **File logging**: Append each request to `~/.local/share/opencode/log/copilot-stats.txt` (one line per request with timestamp, instance ID, model, initiator, and running totals).
-
-### `~/.config/opencode/commands/copilot-stats.md`
-
-Slash command file. OpenCode auto-discovers `{command,commands}/**/*.md` from `~/.config/opencode/`.
-
-```markdown
----
-description: Show GitHub Copilot premium request usage
-model: github-copilot/gpt-5-mini
----
-Call the copilot_stats tool and display its output verbatim. Do not add commentary.
-```
-
-The `model` frontmatter field forces this command to use `gpt-5-mini` (0x multiplier), so viewing stats never costs premium requests.
+| File | Purpose |
+|------|---------|
+| `plugins/copilot-stats.ts` | Plugin. Intercepts fetch, tracks metrics in memory, registers the `copilot_stats` tool, appends to a log file. Installed to `~/.config/opencode/plugins/`. |
+| `commands/copilot-stats.md` | Slash command. Tells the LLM to call the tool using `gpt-5-mini` (0x multiplier) so viewing stats costs nothing. Installed to `~/.config/opencode/commands/`. |
 
 ## OpenCode Plugin System Reference
 
@@ -114,10 +65,11 @@ Key files in the OpenCode source (v1.1.53; clone from https://github.com/anomaly
 | Plugin types | `packages/plugin/src/index.ts` | `Hooks` interface, `PluginInput` type |
 | Tool definition | `packages/plugin/src/tool.ts` | `ToolDefinition` helper |
 | Plugin loader | `packages/opencode/src/plugin/index.ts` | How plugins are loaded and hooks triggered |
-| Copilot auth | `packages/opencode/src/plugin/copilot.ts` | Sets `x-initiator` header (line 122), forces agent for subagents (line 324) |
-| Config & auto-discovery | `packages/opencode/src/config/config.ts` | Glob patterns for plugins, commands, tools (lines 340-469) |
+| Copilot auth | `packages/opencode/src/plugin/copilot.ts` | Sets `x-initiator` header, forces agent for subagents |
+| Config & auto-discovery | `packages/opencode/src/config/config.ts` | Glob patterns for plugins, commands, tools |
 | Tool registry | `packages/opencode/src/tool/registry.ts` | How plugin tools join the tool list |
-| Command execution | `packages/opencode/src/session/prompt.ts` | How slash command templates become prompts (lines 1646-1788) |
+| Command execution | `packages/opencode/src/session/prompt.ts` | How slash command templates become prompts |
+| Path resolution | `packages/opencode/src/global/index.ts` | `Global.Path` — XDG-based log, data, config dirs |
 | Status dialog (TUI) | `packages/opencode/src/cli/cmd/tui/component/dialog-status.tsx` | Hardcoded, not extensible |
 | Status popover (Web) | `packages/app/src/components/status-popover.tsx` | Hardcoded, not extensible |
 

@@ -72,7 +72,8 @@ function renderTable(): string {
 
 // --- File logging ---
 
-const logFile = join(homedir(), ".local/share/opencode/log/copilot-stats.txt")
+const dataDir = process.env.XDG_DATA_HOME || join(homedir(), ".local/share")
+const logFile = join(dataDir, "opencode", "log", "copilot-stats.txt")
 const instanceId = Math.random().toString(36).substring(2, 6)
 
 const timestamp = () => new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60 * 1000).toISOString().replace(/[TZ]/g, " ").trim()

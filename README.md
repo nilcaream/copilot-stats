@@ -22,10 +22,19 @@ This plugin makes it visible. It intercepts outgoing requests, records the model
 
 ## Installation
 
-Copy the two files to your OpenCode configuration directory:
+Clone the repository and symlink the two files into your OpenCode configuration directory:
 
 ```bash
 mkdir -p ~/.config/opencode/plugins ~/.config/opencode/commands
+ln -sf "$(pwd)/plugins/copilot-stats.ts" ~/.config/opencode/plugins/
+ln -sf "$(pwd)/commands/copilot-stats.md" ~/.config/opencode/commands/
+```
+
+Symlinks keep the installed files in sync with the repository — a `git pull` updates them automatically.
+
+Alternatively, copy the files if you prefer a standalone installation:
+
+```bash
 cp plugins/copilot-stats.ts ~/.config/opencode/plugins/
 cp commands/copilot-stats.md ~/.config/opencode/commands/
 ```
@@ -34,16 +43,18 @@ Restart OpenCode. Type `/copilot-stats` in any session to view your usage.
 
 ## Log file
 
-The plugin writes a plain-text log to:
+The plugin appends a plain-text log to OpenCode's log directory:
 
 ```
-~/.local/share/opencode/log/copilot-stats.txt
+$XDG_DATA_HOME/opencode/log/copilot-stats.txt
 ```
 
-Each line records a single request with its timestamp, model, initiator, and running totals. This file is useful for real-time monitoring in a separate terminal:
+On most systems `XDG_DATA_HOME` defaults to `~/.local/share`, so the full path is `~/.local/share/opencode/log/copilot-stats.txt`. If you have set `XDG_DATA_HOME` to a custom value, the log follows it.
+
+Each line records a single request with its timestamp, model, initiator, and running totals. Useful for real-time monitoring in a separate terminal:
 
 ```bash
-tail -F ~/.local/share/opencode/log/copilot-stats.txt
+tail -F "${XDG_DATA_HOME:-$HOME/.local/share}/opencode/log/copilot-stats.txt"
 ```
 
 ## Privacy and security
