@@ -143,7 +143,7 @@ if (originalFetch) {
         const headers = new Headers(request.headers)
         const initiator = headers.get("x-initiator")
 
-        if (request.url.includes("github")) {
+        if (request.url.includes("github.com") || request.url.includes("ghe.com")) {
             if (initiator) {
                 const model = await extractModel(request)
                 record(model, initiator)
