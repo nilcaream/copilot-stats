@@ -1,6 +1,6 @@
 # copilot-stats
 
-An [OpenCode](https://opencode.ai) plugin that tracks GitHub Copilot premium request usage.
+An [OpenCode](https://opencode.ai) plugin that tracks GitHub Copilot premium request usage for the active session.
 
 GitHub Copilot bills by **premium requests**, not tokens or dollars. Each model carries a fixed multiplier that determines how much quota a single prompt consumes. OpenCode's built-in status bar shows token counts and USD cost, but for Copilot users cost is always $0 and the real budget unit -- premium requests -- stays invisible.
 
@@ -25,9 +25,12 @@ This plugin makes it visible. It intercepts outgoing requests, records the model
 Clone the repository and symlink the two files into your OpenCode configuration directory:
 
 ```bash
-mkdir -p ~/.config/opencode/plugins ~/.config/opencode/commands
+mkdir -p ~/.config/opencode/{plugins,commands}
 ln -sf "$(pwd)/plugins/copilot-stats.ts" ~/.config/opencode/plugins/
+# For GitHub
 ln -sf "$(pwd)/commands/copilot-stats.md" ~/.config/opencode/commands/
+# For GitHub Enterprise
+ln -sf "$(pwd)/commands/copilot-stats-enterprise.md" ~/.config/opencode/commands/copilot-stats.md
 ```
 
 Symlinks keep the installed files in sync with the repository — a `git pull` updates them automatically.
@@ -36,7 +39,10 @@ Alternatively, copy the files if you prefer a standalone installation:
 
 ```bash
 cp plugins/copilot-stats.ts ~/.config/opencode/plugins/
+# For GitHub
 cp commands/copilot-stats.md ~/.config/opencode/commands/
+# For GitHub Enterprise
+cp commands/copilot-stats-enterprise.md ~/.config/opencode/commands/copilot-stats.md
 ```
 
 Restart OpenCode. Type `/copilot-stats` in any session to view your usage.
