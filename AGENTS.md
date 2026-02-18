@@ -47,6 +47,10 @@ The `/copilot-stats` command sets `model: github-copilot/gpt-5-mini` in its fron
 
 The `multipliers` object in `plugins/copilot-stats.ts` is the single source of truth. Unlisted models default to 1x. Update the object when GitHub changes pricing — see the [billing documentation](https://docs.github.com/en/copilot/concepts/billing/copilot-requests).
 
+## Conventions
+
+This project follows the [Conventional Commits](https://www.conventionalcommits.org/) standard. Common types: `feat`, `fix`, `docs`, `refactor`, `chore`. Keep the subject line concise and use the body for context when needed.
+
 ## File Layout
 
 Two files, both auto-discovered by OpenCode (no `opencode.json` changes needed):
