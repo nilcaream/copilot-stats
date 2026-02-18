@@ -22,16 +22,25 @@ This plugin makes it visible. It intercepts outgoing requests, records the model
 
 ## Installation
 
-Clone the repository and symlink the two files into your OpenCode configuration directory:
+Clone the repository, enter it, then symlink the two files into your OpenCode configuration directory:
 
 ```bash
-mkdir -p ~/.config/opencode/{plugins,commands}
-ln -sf "$(pwd)/plugins/copilot-stats.ts" ~/.config/opencode/plugins/
+git clone https://github.com/nilcaream/copilot-stats
+cd copilot-stats
+mkdir -p ~/.config/opencode/plugins ~/.config/opencode/commands
+ln -sf "$PWD/plugins/copilot-stats.ts" ~/.config/opencode/plugins/copilot-stats.ts
 # For GitHub
-ln -sf "$(pwd)/commands/copilot-stats.md" ~/.config/opencode/commands/
+ln -sf "$PWD/commands/copilot-stats.md" ~/.config/opencode/commands/copilot-stats.md
 # For GitHub Enterprise
-ln -sf "$(pwd)/commands/copilot-stats-enterprise.md" ~/.config/opencode/commands/copilot-stats.md
+ln -sf "$PWD/commands/copilot-stats-enterprise.md" ~/.config/opencode/commands/copilot-stats.md
+readlink -f ~/.config/opencode/plugins/copilot-stats.ts
+readlink -f ~/.config/opencode/commands/copilot-stats.md
 ```
+
+The two `readlink` lines should end with:
+
+- `.../copilot-stats/plugins/copilot-stats.ts`
+- `.../copilot-stats/commands/copilot-stats.md` (GitHub) or `.../copilot-stats/commands/copilot-stats-enterprise.md` (GitHub Enterprise)
 
 Symlinks keep the installed files in sync with the repository — a `git pull` updates them automatically.
 
