@@ -28,19 +28,21 @@ Clone the repository, enter it, then symlink the two files into your OpenCode co
 git clone https://github.com/nilcaream/copilot-stats
 cd copilot-stats
 mkdir -p ~/.config/opencode/plugins ~/.config/opencode/commands
+
 ln -sf "$PWD/plugins/copilot-stats.ts" ~/.config/opencode/plugins/copilot-stats.ts
+
 # For GitHub
 ln -sf "$PWD/commands/copilot-stats.md" ~/.config/opencode/commands/copilot-stats.md
 # For GitHub Enterprise
 ln -sf "$PWD/commands/copilot-stats-enterprise.md" ~/.config/opencode/commands/copilot-stats.md
-readlink -f ~/.config/opencode/plugins/copilot-stats.ts
-readlink -f ~/.config/opencode/commands/copilot-stats.md
 ```
 
-The two `readlink` lines should end with:
+Verify the symlinks point to the repository:
 
-- `.../copilot-stats/plugins/copilot-stats.ts`
-- `.../copilot-stats/commands/copilot-stats.md` (GitHub) or `.../copilot-stats/commands/copilot-stats-enterprise.md` (GitHub Enterprise)
+```bash
+ls -la ~/.config/opencode/plugins/copilot-stats.ts
+ls -la ~/.config/opencode/commands/copilot-stats.md
+```
 
 Symlinks keep the installed files in sync with the repository — a `git pull` updates them automatically.
 
@@ -48,6 +50,7 @@ Alternatively, copy the files if you prefer a standalone installation:
 
 ```bash
 cp plugins/copilot-stats.ts ~/.config/opencode/plugins/
+
 # For GitHub
 cp commands/copilot-stats.md ~/.config/opencode/commands/
 # For GitHub Enterprise
