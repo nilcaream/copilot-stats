@@ -26,7 +26,7 @@ The tool returns a pre-formatted markdown table. The LLM does not format the dat
 
 ### Why `globalThis.fetch` interception?
 
-OpenCode's CopilotAuthPlugin (`packages/opencode/src/plugin/copilot.ts:122`) already wraps `globalThis.fetch` to add the `x-initiator` header. Our plugin wraps fetch the same way to intercept requests before they reach the Copilot API. This gives direct access to the request body (model name) and headers (`x-initiator` value: `"agent"` or `"user"`).
+OpenCode's CopilotAuthPlugin (`packages/opencode/src/plugin/copilot.ts:122`) already wraps `globalThis.fetch` to add the `x-initiator` header. Our plugin wraps fetch the same way to intercept requests before they reach the Copilot API. This gives direct access to the request body (model name, last message role for type classification) and headers (`x-initiator` value: `"agent"` or `"user"`).
 
 Alternative approaches considered:
 

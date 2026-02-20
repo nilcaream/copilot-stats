@@ -9,16 +9,16 @@ This plugin makes it visible. It intercepts outgoing requests, records the model
 ## Example output
 
 ```
-| Model            | Initiator | Count |  Cost  |
-|------------------|-----------|-------|--------|
-| claude-haiku-4.5 | user      |    10 |   3.30 |
-| claude-opus-4.6  | agent     |    50 |   0    |
-| claude-opus-4.6  | user      |    30 |  90    |
-| gpt-5-mini       | agent     |   321 |   0    |
-| gpt-5-mini       | user      |    77 |   0    |
+| Model            | Initiator | Type         | Count |  Cost  |
+|------------------|-----------|--------------|-------|--------|
+| claude-haiku-4.5 | user      | prompt       |    10 |   3.30 |
+| claude-opus-4.6  | agent     | tool         |    50 |   0    |
+| claude-opus-4.6  | user      | prompt       |    30 |  90    |
+| gpt-5-mini       | agent     | continuation |   321 |   0    |
+| gpt-5-mini       | user      | prompt       |    77 |   0    |
 ```
 
-**Cost** reflects the premium request multiplier for each model. Agent-initiated requests (subagents, tool calls) cost zero regardless of the model. The `/copilot-stats` command itself uses `gpt-5-mini` (0x multiplier), so checking your stats never consumes quota.
+**Cost** reflects the premium request multiplier for each model. Agent-initiated requests (subagents, tool calls) cost zero regardless of the model. **Type** shows how the request was classified: `prompt` (user message), `tool` (tool result), `continuation` (assistant turn), or `compaction` (context compaction). The `/copilot-stats` command itself uses `gpt-5-mini` (0x multiplier), so checking your stats never consumes quota.
 
 ## Installation
 
@@ -69,7 +69,7 @@ $XDG_DATA_HOME/opencode/log/copilot-stats.txt
 
 On most systems `XDG_DATA_HOME` defaults to `~/.local/share`, so the full path is `~/.local/share/opencode/log/copilot-stats.txt`. If you have set `XDG_DATA_HOME` to a custom value, the log follows it.
 
-Each line records a single request with its timestamp, model, initiator, and running totals. Useful for real-time monitoring in a separate terminal:
+Each line records a single request with its timestamp, model, initiator, request type, and running totals. Useful for real-time monitoring in a separate terminal:
 
 ```bash
 tail -F "${XDG_DATA_HOME:-$HOME/.local/share}/opencode/log/copilot-stats.txt"
@@ -81,7 +81,7 @@ This plugin operates entirely within the OpenCode process. It deserves scrutiny 
 
 **What it does:**
 
-- Reads the `model` field from outgoing request bodies and the `x-initiator` header that OpenCode already sets.
+- Reads the `model` field and the last message's role from outgoing request bodies, plus the `x-initiator` header that OpenCode already sets. The message role is used solely to classify the request type (prompt, tool, continuation, or compaction) — message content is not stored or logged, except for detecting a known compaction marker string.
 - Stores request counts and costs in memory for the lifetime of the process.
 - Appends one line per request to a local log file.
 
@@ -101,14 +101,27 @@ Source: [GitHub Copilot billing documentation](https://docs.github.com/en/copilo
 
 | Model                  | Multiplier |
 |------------------------|------------|
-| gpt-5-mini             | 0          |
 | gpt-4.1                | 0          |
 | gpt-4o                 | 0          |
+| gpt-5-mini             | 0          |
 | raptor-mini            | 0          |
 | grok-code-fast-1       | 0.25       |
-| gpt-5.1-codex-mini     | 0.33       |
 | claude-haiku-4.5       | 0.33       |
 | gemini-3-flash-preview | 0.33       |
+| gpt-5.1-codex-mini     | 0.33       |
+| claude-sonnet-4        | 1          |
+| claude-sonnet-4.5      | 1          |
+| claude-sonnet-4.6      | 1          |
+| gemini-2.5-pro         | 1          |
+| gemini-3-pro-preview   | 1          |
+| gemini-3.1-pro-preview | 1          |
+| gpt-5                  | 1          |
+| gpt-5.1                | 1          |
+| gpt-5.1-codex          | 1          |
+| gpt-5.1-codex-max      | 1          |
+| gpt-5.2                | 1          |
+| gpt-5.2-codex          | 1          |
+| gpt-5.3-codex          | 1          |
 | claude-opus-4.5        | 3          |
 | claude-opus-4.6        | 3          |
 | claude-opus-41         | 10         |
