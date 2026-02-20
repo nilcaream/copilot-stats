@@ -22,14 +22,16 @@ function getMultiplier(model: string): number {
     return result === undefined ? 1 : result
 }
 
+type RequestType = "prompt" | "tool" | "continuation" | "compaction" | "unknown"
+
 // --- In-memory metrics ---
 
 const metrics: Record<string, { count: number; cost: number }> = {}
 
-function record(model: string, initiator: string) {
+function record(model: string, initiator: string, type: RequestType) {
     const multiplier = getMultiplier(model)
     const cost = initiator === "agent" ? 0 : multiplier
-    const key = `${model}|${initiator}`
+    const key = `${model}|${initiator}|${type}`
     const entry = metrics[key]
     if (entry) {
         entry.count++
@@ -55,17 +57,18 @@ function renderTable(): string {
     if (keys.length === 0) return "No Copilot requests recorded yet."
 
     const rows = keys.map((key) => {
-        const [model, initiator] = key.split("|")
+        const [model, initiator, type] = key.split("|")
         const entry = metrics[key]
-        return {model, initiator, count: entry.count, cost: entry.cost}
+        return {model, initiator, type, count: entry.count, cost: entry.cost}
     })
 
     const modelWidth = Math.max(5, ...rows.map((r) => r.model.length))
+    const typeWidth = Math.max(4, ...rows.map((r) => r.type.length))
     const pad = (v: any, w: number) => w > 0 ? v.toString().padEnd(w) : v.toString().padStart(-w)
     const lines = [
-        `| ${"Model".padEnd(modelWidth)} | Initiator | Count |  Cost  |`,
-        `|${"-".repeat(modelWidth + 2)}|-----------|-------|--------|`,
-        ...rows.map(r => `| ${pad(r.model, modelWidth)} | ${pad(r.initiator, 9)} | ${pad(r.count, -5)} | ${formatCost(r.cost)} |`),
+        `| ${"Model".padEnd(modelWidth)} | Initiator | ${"Type".padEnd(typeWidth)} | Count |  Cost  |`,
+        `|${"-".repeat(modelWidth + 2)}|-----------|${"-".repeat(typeWidth + 2)}|-------|--------|`,
+        ...rows.map(r => `| ${pad(r.model, modelWidth)} | ${pad(r.initiator, 9)} | ${pad(r.type, typeWidth)} | ${pad(r.count, -5)} | ${formatCost(r.cost)} |`),
     ]
     return lines.join("\n")
 }
@@ -78,7 +81,29 @@ const instanceId = Math.random().toString(36).substring(2, 6)
 
 const timestamp = () => new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60 * 1000).toISOString().replace(/[TZ]/g, " ").trim()
 
-function logStats(model: string, initiator: string) {
+// Upgraded to client.app.log once the plugin function is called.
+// Before that, errors during module init are silently dropped — unavoidable
+// because client is not available at fetch-wrapper setup time.
+let logError: (error: any) => void = () => {}
+
+function makeLogError(client: any): (error: any) => void {
+    return (error: any) => {
+        const message = (error || "").toString()
+        // Write to OpenCode's structured log (visible in ~/.local/share/opencode/log/*.log)
+        client.app.log({
+            body: {
+                service: "copilot-stats",
+                level: "error",
+                message,
+            },
+        }).catch(() => {})
+        // Also append to our custom log file so errors appear inline with request lines
+        const line = [timestamp(), "|", instanceId, "|", "ERROR", "|", message].join(" ") + "\n"
+        appendFile(logFile, line).catch(() => {})
+    }
+}
+
+function logStats(model: string, initiator: string, type: RequestType) {
     const multiplier = getMultiplier(model)
     const cost = initiator === "agent" ? 0 : multiplier
     const totalCost = Object.values(metrics).reduce((acc, entry) => acc + entry.cost, 0)
@@ -92,6 +117,8 @@ function logStats(model: string, initiator: string) {
         "|",
         initiator.padEnd(6),
         "|",
+        type.padEnd(12),
+        "|",
         "x",
         multiplier.toFixed(2).padStart(5),
         "|",
@@ -102,37 +129,50 @@ function logStats(model: string, initiator: string) {
         totalCost.toFixed(2).padStart(6)
     ].join(" ") + "\n"
 
-    appendFile(logFile, line).catch(() => {
-    })
-}
-
-function logError(error: any) {
-    const line = [
-        timestamp(),
-        "|",
-        instanceId,
-        "|",
-        "ERROR",
-        "|",
-        (error || "").toString()
-    ].join(" ") + "\n"
-
-    appendFile(logFile, line).catch(() => {
-    })
+    appendFile(logFile, line).catch(logError)
 }
 
 // --- Fetch interception ---
 
-async function extractModel(request: Request): Promise<string> {
-    if (request.headers.get("content-type") === "application/json" && request.body) {
-        try {
-            const body = (await request.clone().json()) as { model?: string }
-            return body.model || "unknown"
-        } catch (e) {
-            logError(e)
-        }
+interface RequestDetail {
+    model: string
+    type: RequestType
+}
+
+const COMPACTION_MARKER = "Provide a detailed prompt for continuing our conversation above"
+
+function extractContent(message: any): string {
+    if (!message) return ""
+    if (typeof message.content === "string") return message.content
+    if (Array.isArray(message.content)) return message.content.map((p: any) => p.text || "").join("")
+    return ""
+}
+
+function classifyType(messages: any[]): RequestType {
+    const last = messages[messages.length - 1]
+    if (!last?.role) return "unknown"
+    if (last.role === "user") {
+        if (extractContent(last).includes(COMPACTION_MARKER)) return "compaction"
+        return "prompt"
     }
+    if (last.role === "tool" || last.role === "tool_result") return "tool"
+    if (last.role === "assistant") return "continuation"
     return "unknown"
+}
+
+async function extractRequestInfo(request: Request): Promise<RequestDetail> {
+    const fallback: RequestDetail = {model: "unknown", type: "unknown"}
+    if (request.headers.get("content-type") !== "application/json" || !request.body) return fallback
+    try {
+        const body = (await request.clone().json()) as {model?: string; messages?: any[]; input?: any[]}
+        const model = body.model || "unknown"
+        const messages = body.messages || body.input || []
+        if (messages.length === 0) return {model, type: "unknown"}
+        return {model, type: classifyType(messages)}
+    } catch (e) {
+        logError(e)
+        return fallback
+    }
 }
 
 const originalFetch = globalThis.fetch
@@ -143,11 +183,11 @@ if (originalFetch) {
         const headers = new Headers(request.headers)
         const initiator = headers.get("x-initiator")
 
-        if (request.url.includes("github.com") || request.url.includes("ghe.com")) {
+        if (request.url.includes("githubcopilot.com") || request.url.includes("github.com") || request.url.includes("ghe.com")) {
             if (initiator) {
-                const model = await extractModel(request)
-                record(model, initiator)
-                logStats(model, initiator)
+                const info = await extractRequestInfo(request)
+                record(info.model, initiator, info.type)
+                logStats(info.model, initiator, info.type)
             } else {
                 logError("Missing x-initiator header")
             }
@@ -161,14 +201,17 @@ if (originalFetch) {
 
 // --- Plugin export ---
 
-export default async () => ({
-    tool: {
-        copilot_stats: {
-            description: "Show GitHub Copilot premium request usage for this OpenCode instance",
-            args: {},
-            async execute() {
-                return renderTable()
+export default async ({ client }: { client: any }) => {
+    logError = makeLogError(client)
+    return {
+        tool: {
+            copilot_stats: {
+                description: "Show GitHub Copilot premium request usage for this OpenCode instance",
+                args: {},
+                async execute() {
+                    return renderTable()
+                },
             },
         },
-    },
-})
+    }
+}
