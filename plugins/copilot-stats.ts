@@ -116,7 +116,7 @@ function makeLogError(client: any): (error: any) => void {
     }
 }
 
-function logStats(model: string, initiator: string, type: RequestType) {
+function logStats(model: string, initiator: string, type: RequestType, status: number, latencyMs: number) {
     const multiplier = getMultiplier(model)
     const cost = initiator === "agent" ? 0 : multiplier
     const totalCost = Object.values(metrics).reduce((acc, entry) => acc + entry.cost, 0)
@@ -139,7 +139,13 @@ function logStats(model: string, initiator: string, type: RequestType) {
         cost.toFixed(2).padStart(5),
         "|",
         "total",
-        totalCost.toFixed(2).padStart(6)
+        totalCost.toFixed(2).padStart(6),
+        "|",
+        "http",
+        status.toString().padStart(3),
+        "|",
+        latencyMs.toString().padStart(6),
+        "ms",
     ].join(" ") + "\n"
 
     appendFile(logFile, line).catch(logError)
@@ -199,8 +205,12 @@ if (originalFetch) {
         if (request.url.includes("githubcopilot.com") || request.url.includes("github.com") || request.url.includes("ghe.com")) {
             if (initiator) {
                 const info = await extractRequestInfo(request)
+                const startTime = Date.now()
+                const resp = await originalFetch(new Request(request, {headers}))
+                const latencyMs = Date.now() - startTime
                 record(info.model, initiator, info.type)
-                logStats(info.model, initiator, info.type)
+                logStats(info.model, initiator, info.type, resp.status, latencyMs)
+                return resp
             } else {
                 logError("Missing x-initiator header")
             }
